@@ -45,6 +45,10 @@ export interface IShare extends RowDataPacket {
     favorite_count: number;
 }
 
+export type ValidMailInfo = {
+    email: string;
+};
+
 export type SignUpInfo = {
     userId: string;
     userEmail: string;

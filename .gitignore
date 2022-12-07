@@ -2,7 +2,9 @@ node_modules
 dist
 sessions
 
-#custom
-
+#folder
 tagClouds
 images
+
+#file
+.env

@@ -3,13 +3,56 @@ import { createHash } from "crypto";
 
 import connection from "../db/db.js";
 import promiseConnection from "../db/db2.js";
-import { IUser, IFavorite, IHistory, SignUpInfo, LoginInfo, PlaceInfo, IPlace } from "../types.js";
+import { IUser, IFavorite, IHistory, SignUpInfo, LoginInfo, PlaceInfo, IPlace, ValidMailInfo } from "../types.js";
 import jwk, { UserJwtPayload } from "jsonwebtoken";
+import nodemailer from "nodemailer";
+import path from "path";
+import ejs from "ejs";
 
 const router = express.Router();
 
 router.get("/", (req, res) => {
     res.send("user server");
+});
+
+router.post("/valid-mail", async (req, res) => {
+    const validMailInfo = req.body as ValidMailInfo;
+    let authNum = Math.random().toString().slice(2, 8);
+    let emailTemplete;
+
+    ejs.renderFile(path.resolve("public/resources/mail.ejs"), { authCode: authNum }, function (err, data) {
+        if (err) {
+            console.log(err);
+        }
+        emailTemplete = data;
+    });
+
+    let transporter = nodemailer.createTransport({
+        service: "gmail",
+        host: "smtp.gmail.com",
+        port: 587,
+        secure: false,
+        auth: {
+            user: process.env.MAILER_ID,
+            pass: process.env.MAILER_PASSWORD,
+        },
+    });
+
+    let mailOptions = await transporter.sendMail({
+        from: `IAM.tukorea`,
+        to: validMailInfo.email,
+        subject: "[IAM] MAI 서비스 회원가입을 위한 인증코드를 입력해주세요.",
+        html: emailTemplete,
+    });
+
+    transporter.sendMail(mailOptions, function (error, info) {
+        if (error) {
+            console.log(error);
+        }
+        console.log("Finish sending email : " + info.response);
+        res.send(authNum);
+        transporter.close();
+    });
 });
 
 router.post("/register", async (req, res) => {
