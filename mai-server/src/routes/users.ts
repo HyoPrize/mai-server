@@ -3,11 +3,25 @@ import { createHash } from "crypto";
 
 import connection from "../db/db.js";
 import promiseConnection from "../db/db2.js";
-import { IUser, IFavorite, IHistory, SignUpInfo, LoginInfo, PlaceInfo, IPlace, ValidMailInfo } from "../types.js";
+import {
+    IUser,
+    IFavorite,
+    IHistory,
+    SignUpInfo,
+    LoginInfo,
+    PlaceInfo,
+    IPlace,
+    MailInfo,
+    ImageInfo,
+    ChangePasswordInfo,
+} from "../types.js";
 import jwk, { UserJwtPayload } from "jsonwebtoken";
 import nodemailer from "nodemailer";
 import path from "path";
 import ejs from "ejs";
+import multer, { diskStorage } from "multer";
+import fs from "fs";
+import jimp from "jimp";
 
 const router = express.Router();
 
@@ -16,13 +30,14 @@ router.get("/", (req, res) => {
 });
 
 router.post("/valid-mail", async (req, res) => {
-    const validMailInfo = req.body as ValidMailInfo;
+    const mailInfo = req.body as MailInfo;
     let authNum = Math.random().toString().slice(2, 8);
     let emailTemplete;
 
-    ejs.renderFile(path.resolve("public/resources/mail.ejs"), { authCode: authNum }, function (err, data) {
+    ejs.renderFile(path.resolve("public/resources/valid_mail.ejs"), { authCode: authNum }, function (err, data) {
         if (err) {
             console.log(err);
+            res.sendStatus(400);
         }
         emailTemplete = data;
     });
@@ -40,7 +55,7 @@ router.post("/valid-mail", async (req, res) => {
 
     let mailOptions = await transporter.sendMail({
         from: `IAM.tukorea`,
-        to: validMailInfo.email,
+        to: mailInfo.email,
         subject: "[IAM] MAI 서비스 회원가입을 위한 인증코드를 입력해주세요.",
         html: emailTemplete,
     });
@@ -48,6 +63,7 @@ router.post("/valid-mail", async (req, res) => {
     transporter.sendMail(mailOptions, function (error, info) {
         if (error) {
             console.log(error);
+            res.sendStatus(400);
         }
         console.log("Finish sending email : " + info.response);
         res.send(authNum);
@@ -55,13 +71,126 @@ router.post("/valid-mail", async (req, res) => {
     });
 });
 
+router.post("/id-mail", async (req, res) => {
+    const mailInfo = req.body as MailInfo;
+    let emailTemplete;
+
+    const userQuery = `SELECT * FROM USERS WHERE user_email="${mailInfo.email}"`;
+    const [users, fields] = await promiseConnection.query<IUser[]>(userQuery);
+    if (users.length > 0) {
+        ejs.renderFile(path.resolve("public/resources/id_mail.ejs"), { id: users[0].user_id }, function (err, data) {
+            if (err) {
+                console.log(err);
+                res.sendStatus(400);
+            }
+            emailTemplete = data;
+        });
+
+        let transporter = nodemailer.createTransport({
+            service: "gmail",
+            host: "smtp.gmail.com",
+            port: 587,
+            secure: false,
+            auth: {
+                user: process.env.MAILER_ID,
+                pass: process.env.MAILER_PASSWORD,
+            },
+        });
+
+        let mailOptions = await transporter.sendMail({
+            from: `IAM.tukorea`,
+            to: mailInfo.email,
+            subject: "[IAM] 회원님의 아이디를 확인해주세요.",
+            html: emailTemplete,
+        });
+
+        transporter.sendMail(mailOptions, function (error, info) {
+            if (error) {
+                console.log(error);
+                res.sendStatus(400);
+            }
+            console.log("Finish sending email : " + info.response);
+            res.sendStatus(200);
+            transporter.close();
+        });
+    } else {
+        res.sendStatus(400);
+    }
+});
+
+router.post("/password-mail", async (req, res) => {
+    const mailInfo = req.body as MailInfo;
+    let authNum = Math.random().toString().slice(2, 8);
+    let emailTemplete;
+
+    const userQuery = `SELECT * FROM USERS WHERE user_id="${mailInfo.id}" and user_email="${mailInfo.email}"`;
+    const [users, fields] = await promiseConnection.query<IUser[]>(userQuery);
+    if (users.length > 0) {
+        ejs.renderFile(path.resolve("public/resources/password_mail.ejs"), { authCode: authNum }, function (err, data) {
+            if (err) {
+                console.log(err);
+                res.sendStatus(400);
+            }
+            emailTemplete = data;
+        });
+
+        let transporter = nodemailer.createTransport({
+            service: "gmail",
+            host: "smtp.gmail.com",
+            port: 587,
+            secure: false,
+            auth: {
+                user: process.env.MAILER_ID,
+                pass: process.env.MAILER_PASSWORD,
+            },
+        });
+
+        let mailOptions = await transporter.sendMail({
+            from: `IAM.tukorea`,
+            to: mailInfo.email,
+            subject: "[IAM] MAI 비밀번호 재설정을 위한 인증코드를 입력해주세요.",
+            html: emailTemplete,
+        });
+
+        transporter.sendMail(mailOptions, function (error, info) {
+            if (error) {
+                console.log(error);
+                res.sendStatus(400);
+            }
+            console.log("Finish sending email : " + info.response);
+            res.send(authNum);
+            transporter.close();
+        });
+    } else {
+        res.sendStatus(400);
+    }
+});
+
+router.post("/change-password", async (req, res) => {
+    const changePasswordInfo = req.body as ChangePasswordInfo;
+
+    const salt = Math.round(new Date().valueOf() * Math.random()) + "";
+    const hashPassword = createHash("sha512")
+        .update(changePasswordInfo.password + salt)
+        .digest("hex");
+    const userUpdateQuery = `UPDATE users SET user_password = '${hashPassword}', user_salt = '${salt}' WHERE user_email="${changePasswordInfo.email}"`;
+    connection.query(userUpdateQuery, (error, rows) => {
+        if (error) {
+            console.log(error);
+            res.sendStatus(400);
+        } else {
+            res.sendStatus(200);
+        }
+    });
+});
+
 router.post("/register", async (req, res) => {
     const signUpInfo: SignUpInfo = req.body;
 
     const userQuery = `SELECT * FROM USERS WHERE user_id="${signUpInfo.userId}" or user_email="${signUpInfo.userEmail}"`;
-    const [result, fields] = await promiseConnection.query<IUser[]>(userQuery);
+    const [users, fields] = await promiseConnection.query<IUser[]>(userQuery);
 
-    if (result.length > 0) {
+    if (users.length > 0) {
         res.json({
             isSuccess: false,
             message: "아이디 혹은 이메일이 중복됩니다.",
@@ -95,15 +224,15 @@ router.post("/login", async (req, res) => {
     const loginInfo: LoginInfo = req.body;
 
     const query = `SELECT * FROM users WHERE user_id = "${loginInfo.userId}"`;
-    const [result, fields] = await promiseConnection.query<IUser[]>(query);
-    if (result.length > 0) {
+    const [users, fields] = await promiseConnection.query<IUser[]>(query);
+    if (users.length > 0) {
         const hashPassword = createHash("sha512")
-            .update(loginInfo.userPassword + result[0].user_salt)
+            .update(loginInfo.userPassword + users[0].user_salt)
             .digest("hex");
 
-        if (result[0].user_password === hashPassword) {
+        if (users[0].user_password === hashPassword) {
             const newJwk = jwk.sign(
-                { userId: result[0].user_id, userEmail: result[0].user_email },
+                { userNo: users[0].user_no, userId: users[0].user_id, userEmail: users[0].user_email },
                 process.env.JWT_SECRET_KEY as string,
                 {
                     expiresIn: "1h",
@@ -112,8 +241,9 @@ router.post("/login", async (req, res) => {
             );
             res.json({
                 isSuccess: true,
-                userId: result[0].user_id,
-                userEmail: result[0].user_email,
+                userNo: users[0].user_no.toString(),
+                userId: users[0].user_id,
+                userEmail: users[0].user_email,
                 token: newJwk,
                 message: "로그인이 완료되었습니다.",
             });
@@ -141,7 +271,9 @@ router.get("/check", (req, res) => {
             const userJwtPayload = decode as UserJwtPayload;
             res.json({
                 isLogin: true,
-                userInfo: { userId: userJwtPayload.userId, userEmail: userJwtPayload.userEmail },
+                userNo: userJwtPayload.userNo.toString(),
+                userId: userJwtPayload.userId,
+                userEmail: userJwtPayload.userEmail,
             });
         }
     });
@@ -283,6 +415,52 @@ router.get("/histories", async (req, res) => {
             }
         }
     });
+});
+
+const upload = multer({
+    storage: diskStorage({
+        destination(req, file, done) {
+            done(null, "src/images/users");
+        },
+        filename(req, file, done) {
+            done(null, file.originalname);
+        },
+    }),
+    limits: { fileSize: 5 * 1024 * 1024 },
+});
+
+router.post("/upload", upload.single("image"), async (req, res) => {
+    try {
+        if (req.file) {
+            const imageDest = req.file.destination;
+            const basename = path.basename(req.file.originalname, path.extname(req.file.originalname));
+            const image = await jimp.read(req.file.path);
+            image.resize(256, 256).write(path.join(imageDest, basename + ".jpg"));
+            fs.unlinkSync(req.file.path);
+        }
+        res.sendStatus(200);
+    } catch (error) {
+        console.error(error);
+        res.sendStatus(400);
+    }
+});
+
+router.get("/image", async (req, res) => {
+    const imageInfo = req.query as ImageInfo;
+
+    const userQuery = `SELECT * FROM users WHERE user_no = "${imageInfo.userNo}"`;
+    const [users, fields] = await promiseConnection.query<IUser[]>(userQuery);
+
+    if (users.length > 0) {
+        const imagePath = path.resolve(`src/images/users/${users[0].user_no}.jpg`);
+        if (fs.existsSync(imagePath)) {
+            res.sendFile(imagePath);
+        } else {
+            res.sendFile(path.resolve("public/resources/mai_logo.png"));
+        }
+    } else {
+        res.sendFile(path.resolve("public/resources/mai_logo.png"));
+    }
 });
 
 export default router;

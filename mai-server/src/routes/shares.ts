@@ -15,7 +15,7 @@ router.get("/", async (req, res) => {
             const { length }: ShareLengthInfo = req.query;
 
             if (length && length > 0) {
-                const shareQuery = `SELECT * FROM (SELECT place_id, count(place_id) as favorite_count FROM favorites GROUP BY place_id) as tb ORDER BY tb.favorite_count LIMIT ${length}`;
+                const shareQuery = `SELECT * FROM (SELECT place_id, count(place_id) as favorite_count FROM favorites GROUP BY place_id) as tb ORDER BY tb.favorite_count DESC LIMIT ${length}`;
                 const [shares, shareFields] = await promiseConnection.query<IShare[]>(shareQuery);
 
                 if (shares.length > 0) {

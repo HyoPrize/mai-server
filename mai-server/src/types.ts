@@ -45,8 +45,14 @@ export interface IShare extends RowDataPacket {
     favorite_count: number;
 }
 
-export type ValidMailInfo = {
+export type MailInfo = {
     email: string;
+    id?: string;
+};
+
+export type ChangePasswordInfo = {
+    email: string;
+    password: string;
 };
 
 export type SignUpInfo = {
@@ -79,8 +85,13 @@ export type ShareLengthInfo = {
     length?: number;
 };
 
+export type ImageInfo = {
+    userNo: string;
+};
+
 declare module "jsonwebtoken" {
     export interface UserJwtPayload extends JwtPayload {
+        userNo: number;
         userId: string;
         userEmail: string;
     }
