@@ -19,19 +19,21 @@ router.get("/", async (req, res) => {
                 const [shares, shareFields] = await promiseConnection.query<IShare[]>(shareQuery);
 
                 if (shares.length > 0) {
-                    const sharePlaceId = shares.map((share) => share.place_id);
-                    const placeQuery = `SELECT * FROM places WHERE place_id in (${sharePlaceId.toString()})`;
+                    const sharedPlaceIds = shares.map((share) => share.place_id);
+                    const placeQuery = `SELECT * FROM places WHERE place_id in (${sharedPlaceIds.toString()})`;
                     const [places, placeFields] = await promiseConnection.query<IPlace[]>(placeQuery);
-                    if (places.length > 0) {
+                    if (places.length === shares.length) {
                         res.json(
-                            places.map((place) => ({
-                                placeId: place.place_id,
-                                placeName: place.place_name,
-                                placeAddress: place.place_address,
-                                placeHashtags: place.place_hashtags.split(" ")[0].split("|"),
-                                placefavoriteCount: shares.filter((share) => share.place_id === place.place_id)[0]
-                                    .favorite_count,
-                            }))
+                            shares.map((share) => {
+                                const sharedPlace = places.filter((place) => place.place_id === share.place_id)[0];
+                                return {
+                                    placeId: sharedPlace.place_id,
+                                    placeName: sharedPlace.place_name,
+                                    placeAddress: sharedPlace.place_address,
+                                    placeHashtags: sharedPlace.place_hashtags.split(" ")[0].split("|"),
+                                    placefavoriteCount: share.favorite_count,
+                                };
+                            })
                         );
                     } else {
                         res.sendStatus(401);
