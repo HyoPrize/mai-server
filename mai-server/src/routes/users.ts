@@ -406,9 +406,85 @@ router.get("/histories", async (req, res) => {
                         return {
                             placeId: history.place_id,
                             placeName: history.history_name,
-                            placeHashtags: history.history_hashtags.split(","),
+                            placeHashtags: history.history_hashtags.split("|"),
                         };
                     }),
+                });
+            } else {
+                res.sendStatus(401);
+            }
+        }
+    });
+});
+
+router.post("/histories/add", (req, res) => {
+    const token = req.headers.authorization as string;
+
+    jwk.verify(token, process.env.JWT_SECRET_KEY as string, async (error, decode) => {
+        if (error) {
+            res.sendStatus(401);
+        } else {
+            const userJwtPayload = decode as UserJwtPayload;
+
+            const userQuery = `SELECT * FROM users WHERE user_id = "${userJwtPayload.userId}"`;
+            const [users, fields] = await promiseConnection.query<IUser[]>(userQuery);
+
+            if (users.length > 0) {
+                const placeInfo: PlaceInfo = req.body;
+                const placeQuery = `SELECT * FROM places WHERE place_id = ${placeInfo.placeId}`;
+                const [places, placeFields] = await promiseConnection.query<IPlace[]>(placeQuery);
+
+                if (places.length > 0) {
+                    const distinctQuery = `SELECT * FROM histories WHERE user_no = ${users[0].user_no} and place_id = ${placeInfo.placeId}`;
+                    const [histories, historyFields] = await promiseConnection.query<IHistory[]>(distinctQuery);
+
+                    // delete for update
+                    if (histories.length > 0) {
+                        const historyDeleteQuery = `DELETE FROM histories WHERE user_no = ${users[0].user_no} and place_id = ${placeInfo.placeId}`;
+                        await promiseConnection.query(historyDeleteQuery);
+                    }
+
+                    const historyAddQuery = `INSERT INTO histories(user_no, place_id, history_name, history_hashtags) VALUES("${users[0].user_no}","${placeInfo.placeId}","${places[0].place_name}","${places[0].place_hashtags}");`;
+                    connection.query(historyAddQuery, (error, rows) => {
+                        if (error) {
+                            console.log(error);
+                            res.sendStatus(401);
+                        } else {
+                            res.sendStatus(200);
+                        }
+                    });
+                } else {
+                    res.sendStatus(401);
+                }
+            } else {
+                res.sendStatus(401);
+            }
+        }
+    });
+});
+
+router.post("/histories/delete", (req, res) => {
+    const token = req.headers.authorization as string;
+
+    jwk.verify(token, process.env.JWT_SECRET_KEY as string, async (error, decode) => {
+        if (error) {
+            res.sendStatus(401);
+        } else {
+            const userJwtPayload = decode as UserJwtPayload;
+
+            const userQuery = `SELECT * FROM users WHERE user_id = "${userJwtPayload.userId}"`;
+            const [users, fields] = await promiseConnection.query<IUser[]>(userQuery);
+
+            if (users.length > 0) {
+                const placeInfo: PlaceInfo = req.body;
+                const historyDeleteQuery = `DELETE FROM histories WHERE user_no = ${users[0].user_no} and place_id = ${placeInfo.placeId}`;
+                connection.query(historyDeleteQuery, (error, rows) => {
+                    if (error) {
+                        console.log(error);
+                        res.sendStatus(401);
+                    } else {
+                        res.sendStatus(200);
+                    }
                 });
             } else {
                 res.sendStatus(401);

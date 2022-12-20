@@ -37,7 +37,7 @@ router.get("/", async (req, res) => {
                         res.sendStatus(401);
                     }
                 } else {
-                    res.sendStatus(401);
+                    res.json([]);
                 }
             } else {
                 res.sendStatus(401);
