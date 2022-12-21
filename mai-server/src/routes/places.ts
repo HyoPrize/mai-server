@@ -1,6 +1,6 @@
 import express from "express";
 import promiseConnection from "../db/db2.js";
-import { IPlace, SearchInfo, PlaceInfo, PlaceIdInfo } from "../types.js";
+import { IPlace, SearchQuery, PlaceQuery, PlaceIdBody, PlaceIndexBody } from "../types.js";
 import geolib from "geolib";
 import path from "path";
 import fs from "fs";
@@ -12,19 +12,19 @@ router.get("/", (req, res) => {
 });
 
 router.get("/search", async (req, res) => {
-    const searchInfo: SearchInfo = req.query;
+    const searchQuery: SearchQuery = req.query;
 
-    const placeQuery = `SELECT * FROM places WHERE place_keyword = '${searchInfo.keyword}'`;
+    const placeQuery = `SELECT * FROM places WHERE place_keyword = '${searchQuery.keyword}'`;
     const [places, fields] = await promiseConnection.query<IPlace[]>(placeQuery);
 
-    const centerPoint = { latitude: Number(searchInfo.lat as number), longitude: Number(searchInfo.lon as number) };
+    const centerPoint = { latitude: Number(searchQuery.lat as number), longitude: Number(searchQuery.lon as number) };
     res.json({
         placeIdList: places
             .filter((place) =>
                 geolib.isPointWithinRadius(
                     { latitude: place.place_y, longitude: place.place_x },
                     centerPoint,
-                    searchInfo.distance as number
+                    searchQuery.distance as number
                 )
             )
             .map((place) => place.place_id),
@@ -32,10 +32,12 @@ router.get("/search", async (req, res) => {
 });
 
 router.post("/query", async (req, res) => {
-    const placeIdInfo: PlaceIdInfo = req.body;
+    const placeIdBody: PlaceIdBody = req.body;
 
-    if (placeIdInfo.placeIdList.length > 0) {
-        const placeQuery = `SELECT * FROM places WHERE place_id in (${placeIdInfo.placeIdList.toString()})`;
+    if (placeIdBody.placeIdList.length > 0) {
+        const placeQuery = `SELECT * FROM places WHERE place_id in (${placeIdBody.placeIdList.toString()}) and place_keyword = '${
+            placeIdBody.placeKeyword
+        }'`;
         const [places, fields] = await promiseConnection.query<IPlace[]>(placeQuery);
 
         if (places.length > 0) {
@@ -71,8 +73,8 @@ router.post("/query", async (req, res) => {
 });
 
 router.get("/tag-cloud", async (req, res) => {
-    const placeInfo: PlaceInfo = req.query;
-    const placeId = placeInfo.placeId as number;
+    const placeQuery: PlaceQuery = req.query;
+    const placeId = placeQuery.placeId as number;
     if (placeId > -1) {
         res.setHeader("Content-Type", "image/png");
         res.sendFile(path.join(process.env.DIR_PATH as string, `/images/tagClouds/${placeId}.png`));
@@ -80,8 +82,8 @@ router.get("/tag-cloud", async (req, res) => {
 });
 
 router.get("/image", async (req, res) => {
-    const placeInfo: PlaceInfo = req.query;
-    const placeId = placeInfo.placeId as number;
+    const placeQuery: PlaceQuery = req.query;
+    const placeId = placeQuery.placeId as number;
     if (placeId > -1) {
         res.setHeader("Content-Type", "image/png");
         const imgPath = path.join(process.env.DIR_PATH as string, `/images/places/${placeId}.png`);

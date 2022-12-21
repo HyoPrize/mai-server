@@ -7,13 +7,14 @@ import {
     IUser,
     IFavorite,
     IHistory,
-    SignUpInfo,
-    LoginInfo,
-    PlaceInfo,
+    SignUpBody,
+    LoginBody,
+    PlaceQuery,
     IPlace,
-    MailInfo,
-    ImageInfo,
-    ChangePasswordInfo,
+    MailBody,
+    ImageQuery,
+    ChangePasswordBody,
+    PlaceIndexBody,
 } from "../types.js";
 import jwk, { UserJwtPayload } from "jsonwebtoken";
 import nodemailer from "nodemailer";
@@ -30,7 +31,7 @@ router.get("/", (req, res) => {
 });
 
 router.post("/valid-mail", async (req, res) => {
-    const mailInfo = req.body as MailInfo;
+    const mailBody = req.body as MailBody;
     let authNum = Math.random().toString().slice(2, 8);
     let emailTemplete;
 
@@ -55,7 +56,7 @@ router.post("/valid-mail", async (req, res) => {
 
     let mailOptions = await transporter.sendMail({
         from: `IAM.tukorea`,
-        to: mailInfo.email,
+        to: mailBody.email,
         subject: "[IAM] MAI 서비스 회원가입을 위한 인증코드를 입력해주세요.",
         html: emailTemplete,
     });
@@ -72,10 +73,10 @@ router.post("/valid-mail", async (req, res) => {
 });
 
 router.post("/id-mail", async (req, res) => {
-    const mailInfo = req.body as MailInfo;
+    const mailBody = req.body as MailBody;
     let emailTemplete;
 
-    const userQuery = `SELECT * FROM USERS WHERE user_email="${mailInfo.email}"`;
+    const userQuery = `SELECT * FROM USERS WHERE user_email="${mailBody.email}"`;
     const [users, fields] = await promiseConnection.query<IUser[]>(userQuery);
     if (users.length > 0) {
         ejs.renderFile(path.resolve("public/resources/id_mail.ejs"), { id: users[0].user_id }, function (err, data) {
@@ -99,7 +100,7 @@ router.post("/id-mail", async (req, res) => {
 
         let mailOptions = await transporter.sendMail({
             from: `IAM.tukorea`,
-            to: mailInfo.email,
+            to: mailBody.email,
             subject: "[IAM] 회원님의 아이디를 확인해주세요.",
             html: emailTemplete,
         });
@@ -119,11 +120,11 @@ router.post("/id-mail", async (req, res) => {
 });
 
 router.post("/password-mail", async (req, res) => {
-    const mailInfo = req.body as MailInfo;
+    const mailBody = req.body as MailBody;
     let authNum = Math.random().toString().slice(2, 8);
     let emailTemplete;
 
-    const userQuery = `SELECT * FROM USERS WHERE user_id="${mailInfo.id}" and user_email="${mailInfo.email}"`;
+    const userQuery = `SELECT * FROM USERS WHERE user_id="${mailBody.id}" and user_email="${mailBody.email}"`;
     const [users, fields] = await promiseConnection.query<IUser[]>(userQuery);
     if (users.length > 0) {
         ejs.renderFile(path.resolve("public/resources/password_mail.ejs"), { authCode: authNum }, function (err, data) {
@@ -147,7 +148,7 @@ router.post("/password-mail", async (req, res) => {
 
         let mailOptions = await transporter.sendMail({
             from: `IAM.tukorea`,
-            to: mailInfo.email,
+            to: mailBody.email,
             subject: "[IAM] MAI 비밀번호 재설정을 위한 인증코드를 입력해주세요.",
             html: emailTemplete,
         });
@@ -167,13 +168,13 @@ router.post("/password-mail", async (req, res) => {
 });
 
 router.post("/change-password", async (req, res) => {
-    const changePasswordInfo = req.body as ChangePasswordInfo;
+    const changePasswordBody = req.body as ChangePasswordBody;
 
     const salt = Math.round(new Date().valueOf() * Math.random()) + "";
     const hashPassword = createHash("sha512")
-        .update(changePasswordInfo.password + salt)
+        .update(changePasswordBody.password + salt)
         .digest("hex");
-    const userUpdateQuery = `UPDATE users SET user_password = '${hashPassword}', user_salt = '${salt}' WHERE user_email="${changePasswordInfo.email}"`;
+    const userUpdateQuery = `UPDATE users SET user_password = '${hashPassword}', user_salt = '${salt}' WHERE user_email="${changePasswordBody.email}"`;
     connection.query(userUpdateQuery, (error, rows) => {
         if (error) {
             console.log(error);
@@ -185,9 +186,9 @@ router.post("/change-password", async (req, res) => {
 });
 
 router.post("/register", async (req, res) => {
-    const signUpInfo: SignUpInfo = req.body;
+    const signUpBody: SignUpBody = req.body;
 
-    const userQuery = `SELECT * FROM USERS WHERE user_id="${signUpInfo.userId}" or user_email="${signUpInfo.userEmail}"`;
+    const userQuery = `SELECT * FROM USERS WHERE user_id="${signUpBody.userId}" or user_email="${signUpBody.userEmail}"`;
     const [users, fields] = await promiseConnection.query<IUser[]>(userQuery);
 
     if (users.length > 0) {
@@ -200,10 +201,10 @@ router.post("/register", async (req, res) => {
 
     const salt = Math.round(new Date().valueOf() * Math.random()) + "";
     const hashPassword = createHash("sha512")
-        .update(signUpInfo.userPassword + salt)
+        .update(signUpBody.userPassword + salt)
         .digest("hex");
 
-    const userInsertQuery = `INSERT INTO USERS(user_id, user_email, user_password, user_salt) VALUES("${signUpInfo.userId}", "${signUpInfo.userEmail}", "${hashPassword}", "${salt}")`;
+    const userInsertQuery = `INSERT INTO USERS(user_id, user_email, user_password, user_salt) VALUES("${signUpBody.userId}", "${signUpBody.userEmail}", "${hashPassword}", "${salt}")`;
     connection.query(userInsertQuery, (error, rows) => {
         if (error) {
             console.log(error);
@@ -221,13 +222,13 @@ router.post("/register", async (req, res) => {
 });
 
 router.post("/login", async (req, res) => {
-    const loginInfo: LoginInfo = req.body;
+    const LoginBody: LoginBody = req.body;
 
-    const query = `SELECT * FROM users WHERE user_id = "${loginInfo.userId}"`;
+    const query = `SELECT * FROM users WHERE user_id = "${LoginBody.userId}"`;
     const [users, fields] = await promiseConnection.query<IUser[]>(query);
     if (users.length > 0) {
         const hashPassword = createHash("sha512")
-            .update(loginInfo.userPassword + users[0].user_salt)
+            .update(LoginBody.userPassword + users[0].user_salt)
             .digest("hex");
 
         if (users[0].user_password === hashPassword) {
@@ -299,6 +300,7 @@ router.get("/favorites", async (req, res) => {
                     favorites: favorites.map((favorite) => {
                         return {
                             placeId: favorite.place_id,
+                            placeKeyword: favorite.place_keyword,
                             placeName: favorite.favorite_name,
                             placeAddress: favorite.favorite_address,
                             placeHashtags: favorite.favorite_hashtags.split("|"),
@@ -325,15 +327,15 @@ router.post("/favorites/add", (req, res) => {
             const [users, fields] = await promiseConnection.query<IUser[]>(userQuery);
 
             if (users.length > 0) {
-                const placeInfo: PlaceInfo = req.body;
-                const placeQuery = `SELECT * FROM places WHERE place_id = ${placeInfo.placeId}`;
+                const placeIndexBody: PlaceIndexBody = req.body;
+                const placeQuery = `SELECT * FROM places WHERE place_id = ${placeIndexBody.placeId} and place_keyword = '${placeIndexBody.placeKeyword}'`;
                 const [places, placeFields] = await promiseConnection.query<IPlace[]>(placeQuery);
 
                 if (places.length > 0) {
-                    const distinctQuery = `SELECT * FROM favorites WHERE user_no = ${users[0].user_no} and place_id = ${placeInfo.placeId}`;
+                    const distinctQuery = `SELECT * FROM favorites WHERE user_no = ${users[0].user_no} and place_id = ${placeIndexBody.placeId} and place_keyword = '${placeIndexBody.placeKeyword}'`;
                     const [favorites, favoriteFields] = await promiseConnection.query<IFavorite[]>(distinctQuery);
                     if (favorites.length === 0) {
-                        const favoriteAddQuery = `INSERT INTO favorites(user_no, place_id, favorite_name, favorite_address, favorite_hashtags) VALUES("${users[0].user_no}","${placeInfo.placeId}","${places[0].place_name}","${places[0].place_address}","${places[0].place_hashtags}");`;
+                        const favoriteAddQuery = `INSERT INTO favorites(user_no, place_id, place_keyword, favorite_name, favorite_address, favorite_hashtags) VALUES("${users[0].user_no}","${placeIndexBody.placeId}","${placeIndexBody.placeKeyword}","${places[0].place_name}","${places[0].place_address}","${places[0].place_hashtags}");`;
                         connection.query(favoriteAddQuery, (error, rows) => {
                             if (error) {
                                 console.log(error);
@@ -368,8 +370,8 @@ router.post("/favorites/delete", (req, res) => {
             const [users, fields] = await promiseConnection.query<IUser[]>(userQuery);
 
             if (users.length > 0) {
-                const placeInfo: PlaceInfo = req.body;
-                const favoriteDeleteQuery = `DELETE FROM favorites WHERE user_no = ${users[0].user_no} and place_id = ${placeInfo.placeId}`;
+                const placeIndexBody: PlaceIndexBody = req.body;
+                const favoriteDeleteQuery = `DELETE FROM favorites WHERE user_no = ${users[0].user_no} and place_id = ${placeIndexBody.placeId} and place_keyword = '${placeIndexBody.placeKeyword}'`;
                 connection.query(favoriteDeleteQuery, (error, rows) => {
                     if (error) {
                         console.log(error);
@@ -405,6 +407,7 @@ router.get("/histories", async (req, res) => {
                     histories: histories.map((history) => {
                         return {
                             placeId: history.place_id,
+                            placeKeyword: history.place_keyword,
                             placeName: history.history_name,
                             placeHashtags: history.history_hashtags.split("|"),
                         };
@@ -430,21 +433,21 @@ router.post("/histories/add", (req, res) => {
             const [users, fields] = await promiseConnection.query<IUser[]>(userQuery);
 
             if (users.length > 0) {
-                const placeInfo: PlaceInfo = req.body;
-                const placeQuery = `SELECT * FROM places WHERE place_id = ${placeInfo.placeId}`;
+                const placeIndexBody: PlaceIndexBody = req.body;
+                const placeQuery = `SELECT * FROM places WHERE place_id = ${placeIndexBody.placeId} and place_keyword = '${placeIndexBody.placeKeyword}'`;
                 const [places, placeFields] = await promiseConnection.query<IPlace[]>(placeQuery);
 
                 if (places.length > 0) {
-                    const distinctQuery = `SELECT * FROM histories WHERE user_no = ${users[0].user_no} and place_id = ${placeInfo.placeId}`;
+                    const distinctQuery = `SELECT * FROM histories WHERE user_no = ${users[0].user_no} and place_id = ${placeIndexBody.placeId} and place_keyword = '${placeIndexBody.placeKeyword}'`;
                     const [histories, historyFields] = await promiseConnection.query<IHistory[]>(distinctQuery);
 
                     // delete for update
                     if (histories.length > 0) {
-                        const historyDeleteQuery = `DELETE FROM histories WHERE user_no = ${users[0].user_no} and place_id = ${placeInfo.placeId}`;
+                        const historyDeleteQuery = `DELETE FROM histories WHERE user_no = ${users[0].user_no} and place_id = ${placeIndexBody.placeId} and place_keyword = '${placeIndexBody.placeKeyword}'`;
                         await promiseConnection.query(historyDeleteQuery);
                     }
 
-                    const historyAddQuery = `INSERT INTO histories(user_no, place_id, history_name, history_hashtags) VALUES("${users[0].user_no}","${placeInfo.placeId}","${places[0].place_name}","${places[0].place_hashtags}");`;
+                    const historyAddQuery = `INSERT INTO histories(user_no, place_id, place_keyword, history_name, history_hashtags) VALUES("${users[0].user_no}","${placeIndexBody.placeId}","${placeIndexBody.placeKeyword}","${places[0].place_name}","${places[0].place_hashtags}");`;
                     connection.query(historyAddQuery, (error, rows) => {
                         if (error) {
                             console.log(error);
@@ -476,8 +479,8 @@ router.post("/histories/delete", (req, res) => {
             const [users, fields] = await promiseConnection.query<IUser[]>(userQuery);
 
             if (users.length > 0) {
-                const placeInfo: PlaceInfo = req.body;
-                const historyDeleteQuery = `DELETE FROM histories WHERE user_no = ${users[0].user_no} and place_id = ${placeInfo.placeId}`;
+                const placeIndexBody: PlaceIndexBody = req.body;
+                const historyDeleteQuery = `DELETE FROM histories WHERE user_no = ${users[0].user_no} and place_id = ${placeIndexBody.placeId} and place_keyword = '${placeIndexBody.placeKeyword}'`;
                 connection.query(historyDeleteQuery, (error, rows) => {
                     if (error) {
                         console.log(error);
@@ -522,7 +525,7 @@ router.post("/upload", upload.single("image"), async (req, res) => {
 });
 
 router.get("/image", async (req, res) => {
-    const imageInfo = req.query as ImageInfo;
+    const imageInfo: ImageQuery = req.query;
 
     const userQuery = `SELECT * FROM users WHERE user_no = "${imageInfo.userNo}"`;
     const [users, fields] = await promiseConnection.query<IUser[]>(userQuery);

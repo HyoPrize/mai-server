@@ -14,6 +14,7 @@ export interface IFavorite extends RowDataPacket {
     favorite_no: number;
     user_no: number;
     place_id: number;
+    place_keyword: string;
     favorite_name: string;
     favorite_address: string;
     favorite_hashtags: string;
@@ -23,6 +24,7 @@ export interface IHistory extends RowDataPacket {
     history_no: number;
     user_no: number;
     place_id: number;
+    place_keyword: string;
     history_name: string;
     history_hashtags: string;
 }
@@ -42,51 +44,62 @@ export interface IPlace extends RowDataPacket {
 
 export interface IShare extends RowDataPacket {
     place_id: number;
+    place_keyword: string;
     favorite_count: number;
 }
 
-export type MailInfo = {
+export type MailBody = {
     email: string;
     id?: string;
 };
 
-export type ChangePasswordInfo = {
+export type ChangePasswordBody = {
     email: string;
     password: string;
 };
 
-export type SignUpInfo = {
+export type SignUpBody = {
     userId: string;
     userEmail: string;
     userPassword: string;
 };
 
-export type LoginInfo = {
+export type LoginBody = {
     userId: string;
     userPassword: string;
 };
 
-export type SearchInfo = {
+export type SearchQuery = {
     keyword?: string;
     lat?: number;
     lon?: number;
     distance?: number;
 };
 
-export type PlaceInfo = {
+export type PlaceBody = {
+    placeId: number;
+};
+
+export type PlaceIndexBody = {
+    placeId: number;
+    placeKeyword: string;
+};
+
+export type PlaceQuery = {
     placeId?: number;
 };
 
-export type PlaceIdInfo = {
+export type PlaceIdBody = {
     placeIdList: number[];
+    placeKeyword: string;
 };
 
-export type ShareLengthInfo = {
+export type ShareLengthQuery = {
     length?: number;
 };
 
-export type ImageInfo = {
-    userNo: string;
+export type ImageQuery = {
+    userNo?: string;
 };
 
 declare module "jsonwebtoken" {
