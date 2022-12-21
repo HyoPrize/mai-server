@@ -1,4 +1,4 @@
-import express, { response } from "express";
+import express from "express";
 import { createHash } from "crypto";
 
 import connection from "../db/db.js";
@@ -23,6 +23,7 @@ import ejs from "ejs";
 import multer, { diskStorage } from "multer";
 import fs from "fs";
 import jimp from "jimp";
+import { DATA_PATH } from "../env.js";
 
 const router = express.Router();
 
@@ -34,8 +35,7 @@ router.post("/valid-mail", async (req, res) => {
     const mailBody = req.body as MailBody;
     let authNum = Math.random().toString().slice(2, 8);
     let emailTemplete;
-
-    ejs.renderFile(path.resolve("public/resources/valid_mail.ejs"), { authCode: authNum }, function (err, data) {
+    ejs.renderFile(path.resolve(DATA_PATH, "resources/valid_mail.ejs"), { authCode: authNum }, function (err, data) {
         if (err) {
             console.log(err);
             res.sendStatus(400);
@@ -79,13 +79,17 @@ router.post("/id-mail", async (req, res) => {
     const userQuery = `SELECT * FROM USERS WHERE user_email="${mailBody.email}"`;
     const [users, fields] = await promiseConnection.query<IUser[]>(userQuery);
     if (users.length > 0) {
-        ejs.renderFile(path.resolve("public/resources/id_mail.ejs"), { id: users[0].user_id }, function (err, data) {
-            if (err) {
-                console.log(err);
-                res.sendStatus(400);
+        ejs.renderFile(
+            path.resolve(DATA_PATH, "resources/id_mail.ejs"),
+            { id: users[0].user_id },
+            function (err, data) {
+                if (err) {
+                    console.log(err);
+                    res.sendStatus(400);
+                }
+                emailTemplete = data;
             }
-            emailTemplete = data;
-        });
+        );
 
         let transporter = nodemailer.createTransport({
             service: "gmail",
@@ -127,13 +131,17 @@ router.post("/password-mail", async (req, res) => {
     const userQuery = `SELECT * FROM USERS WHERE user_id="${mailBody.id}" and user_email="${mailBody.email}"`;
     const [users, fields] = await promiseConnection.query<IUser[]>(userQuery);
     if (users.length > 0) {
-        ejs.renderFile(path.resolve("public/resources/password_mail.ejs"), { authCode: authNum }, function (err, data) {
-            if (err) {
-                console.log(err);
-                res.sendStatus(400);
+        ejs.renderFile(
+            path.resolve(DATA_PATH, "resources/password_mail.ejs"),
+            { authCode: authNum },
+            function (err, data) {
+                if (err) {
+                    console.log(err);
+                    res.sendStatus(400);
+                }
+                emailTemplete = data;
             }
-            emailTemplete = data;
-        });
+        );
 
         let transporter = nodemailer.createTransport({
             service: "gmail",
@@ -499,7 +507,7 @@ router.post("/histories/delete", (req, res) => {
 const upload = multer({
     storage: diskStorage({
         destination(req, file, done) {
-            done(null, "src/images/users");
+            done(null, path.join(DATA_PATH, "images/users"));
         },
         filename(req, file, done) {
             done(null, file.originalname);
@@ -531,14 +539,14 @@ router.get("/image", async (req, res) => {
     const [users, fields] = await promiseConnection.query<IUser[]>(userQuery);
 
     if (users.length > 0) {
-        const imagePath = path.resolve(`src/images/users/${users[0].user_no}.jpg`);
+        const imagePath = path.resolve(DATA_PATH, `images/users/${users[0].user_no}.jpg`);
         if (fs.existsSync(imagePath)) {
             res.sendFile(imagePath);
         } else {
-            res.sendFile(path.resolve("public/resources/mai_logo.png"));
+            res.sendFile(path.resolve(DATA_PATH, "resources/mai_logo.png"));
         }
     } else {
-        res.sendFile(path.resolve("public/resources/mai_logo.png"));
+        res.sendFile(path.resolve(DATA_PATH, "resources/mai_logo.png"));
     }
 });
 

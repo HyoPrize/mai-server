@@ -4,6 +4,7 @@ import { IPlace, SearchQuery, PlaceQuery, PlaceIdBody, PlaceIndexBody } from "..
 import geolib from "geolib";
 import path from "path";
 import fs from "fs";
+import { DATA_PATH } from "../env.js";
 
 const router = express.Router();
 
@@ -77,7 +78,7 @@ router.get("/tag-cloud", async (req, res) => {
     const placeId = placeQuery.placeId as number;
     if (placeId > -1) {
         res.setHeader("Content-Type", "image/png");
-        res.sendFile(path.join(process.env.DIR_PATH as string, `/images/tagClouds/${placeId}.png`));
+        res.sendFile(path.join(DATA_PATH, `images/tagClouds/${placeId}.png`));
     }
 });
 
@@ -86,11 +87,11 @@ router.get("/image", async (req, res) => {
     const placeId = placeQuery.placeId as number;
     if (placeId > -1) {
         res.setHeader("Content-Type", "image/png");
-        const imgPath = path.join(process.env.DIR_PATH as string, `/images/places/${placeId}.png`);
+        const imgPath = path.join(DATA_PATH, `images/places/${placeId}.png`);
         if (fs.existsSync(imgPath)) {
             res.sendFile(imgPath);
         } else {
-            res.sendFile(path.join(process.env.DIR_PATH as string, `/images/places/mai_logo.png`));
+            res.sendFile(path.join(DATA_PATH, `images/places/mai_logo.png`));
         }
     }
 });
