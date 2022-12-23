@@ -3,8 +3,8 @@ dist
 sessions
 
 #folder
-images
-models
+images/
+models/
 
 #file
 .env

@@ -78,7 +78,12 @@ router.get("/tag-cloud", async (req, res) => {
     const placeId = placeQuery.placeId as number;
     if (placeId > -1) {
         res.setHeader("Content-Type", "image/png");
-        res.sendFile(path.join(DATA_PATH, `images/tagClouds/${placeId}.png`));
+        const imgPath = path.join(DATA_PATH, `images/tagClouds/${placeId}.png`);
+        if (fs.existsSync(imgPath)) {
+            res.sendFile(imgPath);
+        } else {
+            res.sendFile(path.join(DATA_PATH, `images/places/mai_logo.png`));
+        }
     }
 });
 
